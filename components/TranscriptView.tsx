@@ -96,7 +96,10 @@ const EditableParagraph: React.FC<{
     }, []);
 
     const handleBlur = () => {
-        onSave(text, false);
+        // Small delay to allow any pending timestamp insertions to complete
+        setTimeout(() => {
+            onSave(text, false);
+        }, 100);
     };
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -263,7 +266,17 @@ export const TranscriptView = forwardRef<TranscriptViewHandle, TranscriptViewPro
         },
         insertSegmentTimestamp: (time: number, speakerLabel: string) => {
             if (editingParaIndex === null) {
-                alert("Please double-click a paragraph to enter edit mode first.");
+                // If no paragraph is being edited, try to find the last paragraph and auto-enter edit mode
+                if (paragraphs.length > 0) {
+                    const lastParaIndex = paragraphs.length - 1;
+                    setEditingParaIndex(lastParaIndex);
+                    // Use a timeout to ensure the edit mode is established before inserting
+                    setTimeout(() => {
+                        setInsertionRequest({ text: `${formatTimestamp(time)} ${speakerLabel}: ` });
+                    }, 50);
+                } else {
+                    alert("Please double-click a paragraph to enter edit mode first.");
+                }
                 return;
             }
             setInsertionRequest({ text: `${formatTimestamp(time)} ${speakerLabel}: ` });
