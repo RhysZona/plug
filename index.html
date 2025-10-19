@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gemini Transcription AI Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'brand-blue': '#4285F4',
+                        'brand-green': '#34A853',
+                        'brand-yellow': '#FBBC05',
+                        'brand-red': '#EA4335',
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+/* Custom Scrollbar for Webkit-based browsers (Chrome, Safari) */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #1a202c; /* gray-900 */
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #4a5568; /* gray-600 */
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #718096; /* gray-500 */
+}
+/* Custom Scrollbar for Firefox */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #1a202c;
+}
+
+/* Performance optimization for long transcripts */
+.virtualized-paragraph {
+  content-visibility: auto;
+  /* An estimated height of a paragraph to help the browser with layout before rendering. */
+  contain-intrinsic-size: 48px;
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/generative-ai@^0.18.0"
+  }
+}
+</script>
+</head>
+<body class="bg-gray-900 text-gray-100">
+<div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
