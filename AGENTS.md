@@ -206,8 +206,31 @@ git push origin feature/add-audio-export-functionality
 #### Step 6: Code Review & Merge
 - Wait for review (if working in team)
 - Address any feedback
-- Once approved, merge via GitHub
-- Delete feature branch after merge
+- Once approved, complete the merge process:
+
+#### Step 7: Merge Feature Branch to Main
+```bash
+# Switch to main branch
+git checkout main
+
+# Merge your feature branch
+git merge your-feature-branch-name
+
+# Push the merged changes to remote
+git push origin main
+```
+
+#### Step 8: Clean Up Feature Branch
+```bash
+# Delete local feature branch
+git branch -d your-feature-branch-name
+
+# Delete remote feature branch
+git push origin --delete your-feature-branch-name
+
+# Verify clean state
+git status
+```
 
 ### Pre-Push Quality Checks
 
