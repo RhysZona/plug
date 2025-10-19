@@ -5,13 +5,14 @@
 1. [Project Overview](#project-overview)
 2. [Architecture & Core Concepts](#architecture--core-concepts)
 3. [Development Guidelines](#development-guidelines)
-4. [Feature Development Process](#feature-development-process)
-5. [Debugging Strategies](#debugging-strategies)
-6. [Code Standards & Conventions](#code-standards--conventions)
-7. [Testing Guidelines](#testing-guidelines)
-8. [Feature Specification Templates](#feature-specification-templates)
-9. [Common Patterns](#common-patterns)
-10. [Troubleshooting](#troubleshooting)
+4. [Git Workflow & Repository Management](#git-workflow--repository-management)
+5. [Feature Development Process](#feature-development-process)
+6. [Debugging Strategies](#debugging-strategies)
+7. [Code Standards & Conventions](#code-standards--conventions)
+8. [Testing Guidelines](#testing-guidelines)
+9. [Feature Specification Templates](#feature-specification-templates)
+10. [Common Patterns](#common-patterns)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -128,6 +129,254 @@ src/
 2. **Environment Variables**: `GEMINI_API_KEY` in `.env.local`
 3. **Development**: `npm run dev` starts on port 3000
 4. **Build**: `npm run build` for production
+
+---
+
+## 🔀 Git Workflow & Repository Management
+
+### Repository Setup & Structure
+
+This repository follows a **feature branch workflow** with pull request-based reviews. Every code change must go through proper version control and testing processes.
+
+#### Repository Information
+- **Main Branch**: `main` - Production-ready code
+- **Remote**: `origin` (GitHub: `jonah721/plug_uttermost`)
+- **Branch Naming**: Use descriptive prefixes
+  - `feature/` - New features
+  - `fix/` - Bug fixes  
+  - `docs/` - Documentation updates
+  - `refactor/` - Code refactoring
+  - `test/` - Test-related changes
+
+### 🚨 MANDATORY Git Workflow for All Changes
+
+**⚠️ CRITICAL RULE**: Every file edit, no matter how small, MUST follow this process:
+
+#### Step 1: Create Feature Branch
+```bash
+# Always start from latest main
+git checkout main
+git pull origin main
+
+# Create descriptive feature branch
+git checkout -b feature/add-audio-export-functionality
+# or
+git checkout -b fix/timeline-rendering-issue
+# or  
+git checkout -b docs/update-api-documentation
+```
+
+#### Step 2: Make Your Changes
+- Edit files as needed
+- Test changes locally
+- Ensure code quality standards are met
+
+#### Step 3: Stage and Commit Changes
+```bash
+# Stage specific files
+git add path/to/changed/file.tsx
+
+# Write descriptive commit message
+git commit -m "feat(audio): Add MP3 export functionality
+
+- Implement audio export service with multiple format support
+- Add export progress tracking and error handling  
+- Update UI with export button in timeline controls
+- Add comprehensive error handling for encoding failures
+
+Closes #123"
+```
+
+#### Step 4: Push Feature Branch
+```bash
+# Push your feature branch to remote
+git push origin feature/add-audio-export-functionality
+```
+
+#### Step 5: Create Pull Request
+1. Go to GitHub repository
+2. Click "New Pull Request"
+3. Select your feature branch → `main`
+4. Fill out PR template with:
+   - **Clear description** of changes
+   - **Testing performed**
+   - **Screenshots** (if UI changes)
+   - **Breaking changes** (if any)
+
+#### Step 6: Code Review & Merge
+- Wait for review (if working in team)
+- Address any feedback
+- Once approved, merge via GitHub
+- Delete feature branch after merge
+
+### Pre-Push Quality Checks
+
+Before pushing any changes, ALWAYS run:
+
+```bash
+# Install dependencies (if needed)
+npm install
+
+# Type checking
+npm run type-check || npx tsc --noEmit
+
+# Build to catch build errors
+npm run build
+
+# Run any existing tests
+npm test
+
+# Check for linting errors (if configured)
+npm run lint || npx eslint . --ext .ts,.tsx
+```
+
+### Git Best Practices for Agents
+
+#### Commit Message Format
+Use conventional commits format:
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
+
+**Examples:**
+```bash
+git commit -m "feat(timeline): Add speaker segment merging functionality"
+git commit -m "fix(audio): Resolve playback stuttering on large files"  
+git commit -m "docs(agents): Update debugging strategies section"
+git commit -m "refactor(contexts): Extract timeline logic to custom hook"
+```
+
+#### Handling Merge Conflicts
+
+If you encounter merge conflicts during pull:
+```bash
+# Fetch latest changes
+git fetch origin
+
+# Merge main into your branch
+git checkout your-feature-branch
+git merge origin/main
+
+# Resolve conflicts in your editor
+# Look for <<<<<<< ======= >>>>>>> markers
+
+# Stage resolved files
+git add resolved-file.tsx
+
+# Complete the merge
+git commit -m "resolve: Merge main into feature branch"
+
+# Push updated branch
+git push origin your-feature-branch
+```
+
+### Repository Maintenance
+
+#### Cleaning Up Branches
+```bash
+# List all branches
+git branch -a
+
+# Delete local feature branch after merge
+git branch -d feature/completed-feature
+
+# Delete remote tracking references for deleted branches
+git remote prune origin
+```
+
+#### Staying Synchronized
+```bash
+# Daily sync routine (recommended)
+git checkout main
+git pull origin main
+git branch --merged main | grep -v main | xargs git branch -d
+```
+
+### Emergency Procedures
+
+#### Reverting Bad Commits
+```bash
+# Revert specific commit (creates new commit)
+git revert <commit-hash>
+
+# Reset to previous commit (destructive!)
+git reset --hard HEAD~1
+# Only use if you haven't pushed yet!
+```
+
+#### Force Push Guidelines
+```bash
+# ⚠️ DANGER: Only use on your own feature branches, NEVER on main
+git push --force-with-lease origin your-feature-branch
+```
+
+### Integration with Development Workflow
+
+#### Before Starting Any Work:
+1. ✅ Sync with main branch
+2. ✅ Create appropriately named feature branch
+3. ✅ Make incremental commits with clear messages
+
+#### During Development:
+1. ✅ Commit frequently with logical groupings
+2. ✅ Test changes locally before committing
+3. ✅ Keep commits focused and atomic
+
+#### Before Pushing:
+1. ✅ Run quality checks (build, type-check, tests)
+2. ✅ Review your own changes in diff
+3. ✅ Ensure commit messages are clear
+4. ✅ Verify no sensitive data (API keys, etc.) is included
+
+#### After Merging:
+1. ✅ Delete feature branch
+2. ✅ Sync main branch locally
+3. ✅ Update documentation if needed
+
+### File-Specific Git Guidelines
+
+#### For AGENTS.md Updates:
+```bash
+git checkout -b docs/update-agents-guide
+# Make changes to AGENTS.md
+git add AGENTS.md
+git commit -m "docs(agents): Add new debugging section for canvas timeline issues"
+git push origin docs/update-agents-guide
+# Create PR
+```
+
+#### For Component Changes:
+```bash
+git checkout -b feature/improve-transcript-performance  
+# Make component changes
+git add components/TranscriptView.tsx
+git commit -m "feat(transcript): Optimize paragraph rendering with virtualization"
+git push origin feature/improve-transcript-performance
+# Create PR
+```
+
+#### For Service Updates:
+```bash
+git checkout -b fix/gemini-api-error-handling
+# Update service files  
+git add services/geminiService.ts
+git commit -m "fix(ai): Improve error handling for Gemini API rate limits"
+git push origin fix/gemini-api-error-handling
+# Create PR
+```
 
 ---
 
