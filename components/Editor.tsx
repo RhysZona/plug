@@ -207,15 +207,18 @@ export const Editor: React.FC = () => {
     };
     
     const handleAddTimestamp = () => {
-        if (selectedSegment) {
-            const speakerLabel = speakerMap[selectedSegment.speaker]?.name;
-            if (speakerLabel) {
-                transcriptViewRef.current?.insertSegmentTimestamp(selectedSegment.start, speakerLabel);
-                setSelectedSegment(null); // Deselect after use for better UX
+        // Add a small delay to ensure we don't conflict with any blur events
+        setTimeout(() => {
+            if (selectedSegment) {
+                const speakerLabel = speakerMap[selectedSegment.speaker]?.name;
+                if (speakerLabel) {
+                    transcriptViewRef.current?.insertSegmentTimestamp(selectedSegment.start, speakerLabel);
+                    setSelectedSegment(null); // Deselect after use for better UX
+                }
+            } else {
+                transcriptViewRef.current?.insertTimestampAtCursor(currentTime);
             }
-        } else {
-            transcriptViewRef.current?.insertTimestampAtCursor(currentTime);
-        }
+        }, 0); // Minimal delay to let any pending events settle
     };
 
     const handleExport = () => {
@@ -411,6 +414,10 @@ export const Editor: React.FC = () => {
                     </button>
 
                     <button
+                        onMouseDown={(e) => {
+                            // Prevent the textarea from losing focus (preventing blur)
+                            e.preventDefault();
+                        }}
                         onClick={handleAddTimestamp}
                         className={`p-2 ml-2 rounded-md transition-colors flex items-center gap-2 text-sm ${
                             selectedSegment
