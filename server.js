@@ -58,13 +58,36 @@ console.log(`  Gemini (env): ${defaultGeminiApiKey ? 'Configured' : 'Not set'}`)
 console.log(`  OpenAI (env): ${defaultOpenaiApiKey ? 'Configured' : 'Not set'}`);
 console.log('  Note: API keys can also be provided via request headers');
 
-// CORS configuration
+// CORS configuration - Support multiple frontend ports
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Vite default port
+  origin: [
+    'http://localhost:3000',  // Current frontend port from debug logs
+    'http://localhost:5173',  // Vite default port  
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
   credentials: true
 }));
 
 app.use(express.json({ limit: '50mb' }));
+
+// Enhanced request logging (based on research findings)
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`\n🔍 [${timestamp}] ${req.method} ${req.path}`);
+  console.log('📡 Headers:', {
+    'content-type': req.headers['content-type'],
+    'x-api-key': req.headers['x-api-key'] ? '***PRESENT***' : 'MISSING',
+    'x-gemini-api-key': req.headers['x-gemini-api-key'] ? '***PRESENT***' : 'MISSING', 
+    'x-openai-api-key': req.headers['x-openai-api-key'] ? '***PRESENT***' : 'MISSING',
+    'origin': req.headers.origin,
+    'user-agent': req.headers['user-agent']?.substring(0, 50) + '...'
+  });
+  console.log('🌐 Remote IP:', req.ip || req.connection.remoteAddress);
+  if (Object.keys(req.query).length > 0) {
+    console.log('🔎 Query params:', req.query);
+  }
+  next();
+});
 
 // Request queue for rate limiting
 class RequestQueue {
@@ -530,13 +553,46 @@ app.get('/api/openai/models', async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  console.log('✅ Health check requested');
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Enhanced error handling middleware (based on research)
+app.use((err, req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.error(`\n❌ [${timestamp}] Backend Error on ${req.method} ${req.path}:`);
+  console.error('Error details:', {
+    message: err.message,
+    stack: err.stack,
+    headers: req.headers,
+    body: req.body
+  });
+  
+  res.status(err.status || 500).json({
+    error: err.message,
+    timestamp,
+    path: req.path,
+    method: req.method
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  console.log(`⚠️ 404 Not Found: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ 
+    error: 'Endpoint not found', 
+    path: req.originalUrl,
+    method: req.method
+  });
 });
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Gemini + OpenAI API proxy server running on port ${PORT}`);
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  console.log(`Gemini API Key configured: ${geminiApiKey ? 'Yes' : 'No'}`);
-  console.log(`OpenAI API Key configured: ${openaiApiKey ? 'Yes' : 'No'}`);
+  console.log(`Gemini API Key configured: ${defaultGeminiApiKey ? 'Yes' : 'No'}`);
+  console.log(`OpenAI API Key configured: ${defaultOpenaiApiKey ? 'Yes' : 'No'}`);
+  console.log(`\n🌐 CORS Origins: http://localhost:3000, http://localhost:5173`);
+  console.log(`📡 Enhanced logging enabled - all requests will be logged`);
+  console.log(`✅ Backend server ready for frontend connections!\n`);
 });
