@@ -1,5 +1,11 @@
 // OpenAI Service: Secure backend proxy for Whisper + GPT-4o Audio Preview
 // SECURITY: All API calls routed through backend - NO API keys in frontend
+// DEBUGGING: Ultra-detailed logging with eye-bleeding level of detail
+
+import { 
+  debug, info, warn, error, trace, fatal,
+  startTimer, endTimer, logNetwork, logNetworkResponse, logFile 
+} from './debugLogger';
 
 export interface OpenAIConfig {
   model: string;
@@ -38,9 +44,20 @@ class OpenAIService {
   private baseUrl: string;
 
   constructor() {
+    info('OpenAIService', 'constructor', 'Initializing OpenAI service', {
+      nodeEnv: process.env.NODE_ENV,
+      production: process.env.NODE_ENV === 'production'
+    });
+
     this.baseUrl = process.env.NODE_ENV === 'production' 
       ? '' // Use relative URLs in production
       : 'http://localhost:3001'; // Backend URL for development
+
+    info('OpenAIService', 'constructor', 'OpenAI service initialized', {
+      baseUrl: this.baseUrl,
+      location: window.location.href,
+      timestamp: Date.now()
+    });
   }
 
   /**
@@ -51,45 +68,139 @@ class OpenAIService {
     file: File, 
     language: string = 'en'
   ): Promise<TranscriptionResult> {
+    const timerLabel = `transcribeAudio_${Date.now()}`;
+    startTimer(timerLabel);
+    
+    info('OpenAIService', 'transcribeAudio', 'Starting audio transcription', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      language,
+      fileSizeMB: (file.size / 1024 / 1024).toFixed(2)
+    });
+
+    logFile('transcribeAudio:validate', file, 'OpenAIService', { language });
+
     // Validate file before sending
     const validation = this.validateAudioFile(file);
     if (!validation.valid) {
+      error('OpenAIService', 'transcribeAudio', 'File validation failed', {
+        error: validation.error,
+        file: {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        }
+      });
       throw new Error(validation.error);
     }
+
+    debug('OpenAIService', 'transcribeAudio', 'File validation passed', validation);
 
     const formData = new FormData();
     formData.append('audio', file);
     formData.append('language', language);
 
+    const url = `${this.baseUrl}/api/openai/transcribe`;
+    const requestId = logNetwork(url, 'POST', {}, formData);
+
+    info('OpenAIService', 'transcribeAudio', 'Sending transcription request', {
+      url,
+      requestId,
+      baseUrl: this.baseUrl,
+      method: 'POST',
+      language
+    });
+
     try {
-      const response = await fetch(`${this.baseUrl}/api/openai/transcribe`, {
+      const response = await fetch(url, {
         method: 'POST',
         body: formData
       });
 
+      debug('OpenAIService', 'transcribeAudio', 'Response received', {
+        requestId,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+        url: response.url,
+        redirected: response.redirected,
+        type: response.type
+      });
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+        let errorData: any;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        error('OpenAIService', 'transcribeAudio', 'HTTP error response', {
+          requestId,
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+
+        logNetworkResponse(requestId, response, errorData, new Error(errorData.error || 'HTTP Error'));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
       
-      console.log(`✅ OpenAI Transcription completed: ${result.transcript.length} chars, ${result.duration}s`);
+      const duration = endTimer(timerLabel);
+
+      info('OpenAIService', 'transcribeAudio', 'Transcription completed successfully', {
+        requestId,
+        transcriptLength: result.transcript.length,
+        duration: result.duration,
+        segments: result.segments?.length || 0,
+        processingTimeMs: duration,
+        charactersPerSecond: result.transcript.length / (duration / 1000)
+      });
+
+      logNetworkResponse(requestId, response, result);
       
       return result;
-    } catch (error: any) {
-      console.error('❌ OpenAI Transcription failed:', error);
+    } catch (networkError: any) {
+      const duration = endTimer(timerLabel);
+
+      fatal('OpenAIService', 'transcribeAudio', 'Network request failed', {
+        requestId,
+        error: networkError.message,
+        stack: networkError.stack,
+        processingTimeMs: duration,
+        url,
+        baseUrl: this.baseUrl,
+        networkState: {
+          onLine: navigator.onLine,
+          connection: (navigator as any).connection ? {
+            effectiveType: (navigator as any).connection.effectiveType,
+            downlink: (navigator as any).connection.downlink,
+            rtt: (navigator as any).connection.rtt
+          } : 'unknown'
+        }
+      });
+
+      logNetworkResponse(requestId, {} as Response, null, networkError);
       
-      // Handle specific error types
-      if (error.message.includes('File too large')) {
+      // Handle specific error types with more detail
+      if (networkError.message.includes('File too large')) {
         throw new Error('File too large. Maximum 25MB for Whisper API. Try compressing the audio.');
       }
       
-      if (error.message.includes('Unsupported format')) {
+      if (networkError.message.includes('Unsupported format')) {
         throw new Error('Unsupported audio format. Use MP3, WAV, MP4, or WEBM.');
       }
+
+      if (networkError.message.includes('Failed to fetch')) {
+        throw new Error(`Network connection failed. Check if backend server is running on ${this.baseUrl}. Original error: ${networkError.message}`);
+      }
       
-      throw error;
+      throw networkError;
     }
   }
 

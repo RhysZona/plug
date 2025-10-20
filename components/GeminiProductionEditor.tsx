@@ -1,8 +1,19 @@
-import React, { useState, useCallback } from 'react';
-import { ModelConfigPanel } from './ModelConfigPanel';
+// Gemini Production Editor: Google AI Studio Integration with Right-Side Configuration
+// Ultra-detailed logging for comprehensive debugging of "Failed to fetch" errors
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MonacoDiffEditor } from './DiffEditor';
+import { ModelConfigPanel } from './ModelConfigPanel';
 import { useGeminiStream, type GeminiConfig } from '../hooks/useGeminiStream';
 import { useData } from '../contexts/DataContext';
+import { transcribe as geminiTranscribe } from '../services/geminiService';
+import { DownloadIcon, UploadCloudIcon, PlayIcon, PauseIcon, SettingsIcon } from './icons/Icons';
+
+// Ultra-detailed logging imports
+import { 
+  debug, info, warn, error, trace, fatal,
+  startTimer, endTimer, logComponent, logState, logFile 
+} from '../services/debugLogger';
 
 interface UploadedAudio {
   fileUri: string;

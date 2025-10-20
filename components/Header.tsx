@@ -1,6 +1,7 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { useUI } from '../contexts/UIContext';
 import { PanelLeftIcon, MessageSquareIcon, BotIcon, SettingsIcon, UsersIcon, EditTextIcon } from './icons/Icons';
+import DebugPanel from './DebugPanel';
 
 export const Header: React.FC = memo(() => {
     const { 
@@ -12,6 +13,8 @@ export const Header: React.FC = memo(() => {
         currentTab,
         setCurrentTab
     } = useUI();
+
+    const [debugPanelOpen, setDebugPanelOpen] = useState(false);
 
     return (
         <header className="flex items-center justify-between bg-gray-800 p-2 border-b border-gray-700 shadow-md h-14 shrink-0 relative z-30">
@@ -65,6 +68,13 @@ export const Header: React.FC = memo(() => {
                 <button onClick={() => setIsTextSpeakerEditorOpen(prev => !prev)} className="p-2 rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue" title="Text Speaker Configuration">
                     <EditTextIcon className="w-5 h-5" />
                 </button>
+                <button 
+                    onClick={() => setDebugPanelOpen(true)} 
+                    className="p-2 rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue" 
+                    title="Debug Panel - Eye-Bleeding Detail Logs"
+                >
+                    <span className="text-base">🐛</span>
+                </button>
                  <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue" title="Settings">
                     <SettingsIcon className="w-5 h-5" />
                 </button>
@@ -72,6 +82,12 @@ export const Header: React.FC = memo(() => {
                     <MessageSquareIcon className="w-5 h-5" />
                 </button>
             </div>
+            
+            {/* Debug Panel */}
+            <DebugPanel 
+                isOpen={debugPanelOpen} 
+                onClose={() => setDebugPanelOpen(false)} 
+            />
         </header>
     );
 });
