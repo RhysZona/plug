@@ -5,8 +5,11 @@ import {
   debug, info, warn, error, trace, fatal,
   startTimer, endTimer, logNetwork, logNetworkResponse, logFile 
 } from './debugLogger';
+import { configManager } from './configManager';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? '' // Use relative URLs in production
+  : 'http://localhost:3001/api';
 
 /**
  * Transcribes an audio file using the backend proxy.
@@ -44,8 +47,12 @@ export const transcribe = async (file: File, prompt: string): Promise<string> =>
             fileSize: file.size
         });
 
+        // Get request config with headers for API key
+        const requestConfig = configManager.getRequestConfig('gemini');
+        
         const uploadResponse = await fetch(uploadUrl, {
             method: 'POST',
+            headers: requestConfig.headers,
             body: formData,
         });
 
@@ -114,7 +121,10 @@ export const transcribe = async (file: File, prompt: string): Promise<string> =>
 
         const transcribeResponse = await fetch(transcribeUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                ...requestConfig.headers,
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(transcribeBody),
         });
 
@@ -230,9 +240,15 @@ export const edit = async (words: MatchedWord[], systemPrompt: string): Promise<
     try {
         const transcriptText = words.map(w => w.punctuated_word).join(' ');
 
+        // Get request config with headers for API key
+        const requestConfig = configManager.getRequestConfig('gemini');
+        
         const editResponse = await fetch(`${API_BASE_URL}/generate-content`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                ...requestConfig.headers,
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
                 prompt: transcriptText,
                 systemInstruction: `${systemPrompt}. Respond only with the edited transcript text. Do not add any explanation or comments.`,

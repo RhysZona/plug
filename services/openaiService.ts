@@ -6,6 +6,7 @@ import {
   debug, info, warn, error, trace, fatal,
   startTimer, endTimer, logNetwork, logNetworkResponse, logFile 
 } from './debugLogger';
+import { configManager } from './configManager';
 
 export interface OpenAIConfig {
   model: string;
@@ -113,8 +114,12 @@ class OpenAIService {
     });
 
     try {
+      // Get request config with headers for API key
+      const requestConfig = configManager.getRequestConfig('openai');
+      
       const response = await fetch(url, {
         method: 'POST',
+        headers: requestConfig.headers,
         body: formData
       });
 
@@ -214,9 +219,13 @@ class OpenAIService {
     audioBase64?: string
   ): Promise<ReadableStream<string>> {
     try {
+      // Get request config with headers for API key
+      const requestConfig = configManager.getRequestConfig('openai');
+      
       const response = await fetch(`${this.baseUrl}/api/openai/stream-edit`, {
         method: 'POST',
         headers: {
+          ...requestConfig.headers,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
