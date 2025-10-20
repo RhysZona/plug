@@ -7,6 +7,7 @@ import { ModelConfigPanel } from './ModelConfigPanel';
 import { useGeminiStream, type GeminiConfig } from '../hooks/useGeminiStream';
 import { useData } from '../contexts/DataContext';
 import { transcribe as geminiTranscribe } from '../services/geminiService';
+import { configManager } from '../services/configManager';
 import { DownloadIcon, UploadCloudIcon, PlayIcon, PauseIcon, SettingsIcon } from './icons/Icons';
 
 // Ultra-detailed logging imports
@@ -58,9 +59,29 @@ export const GeminiProductionEditor: React.FC = () => {
       const formData = new FormData();
       formData.append('audio', audioFile);
 
+      // Get API key headers from configManager
+      const requestConfig = configManager.getRequestConfig('gemini');
+      const uploadHeaders = { ...requestConfig.headers };
+      delete uploadHeaders['Content-Type']; // Remove Content-Type for FormData
+      
+      info('GeminiProductionEditor', 'handleTranscribe', 'Starting audio upload', {
+        url: 'http://localhost:3001/api/upload-audio',
+        fileName: audioFile.name,
+        fileSize: audioFile.size,
+        headers: uploadHeaders,
+        hasAPIKey: !!configManager.getAPIKey('gemini')
+      });
+      
       const uploadResponse = await fetch('http://localhost:3001/api/upload-audio', {
         method: 'POST',
+        headers: uploadHeaders,
         body: formData,
+      });
+      
+      info('GeminiProductionEditor', 'handleTranscribe', 'Upload response received', {
+        status: uploadResponse.status,
+        statusText: uploadResponse.statusText,
+        ok: uploadResponse.ok
       });
 
       if (!uploadResponse.ok) {

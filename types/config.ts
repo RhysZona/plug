@@ -157,8 +157,8 @@ export const API_PROVIDERS = {
   },
   openai: {
     name: 'OpenAI',
-    keyFormat: 'sk-...',
-    keyValidation: /^sk-[a-zA-Z0-9]{48,}$/,
+    keyFormat: 'sk-... or sk-proj-...',
+    keyValidation: /^sk-(proj-)?[a-zA-Z0-9]{40,}$/,
     description: 'OpenAI\'s GPT models and Whisper for audio processing',
     setupUrl: 'https://platform.openai.com/api-keys',
     features: ['Text generation', 'Audio transcription', 'Audio generation'],
