@@ -9,6 +9,7 @@ import { useData } from '../contexts/DataContext';
 import { transcribe as geminiTranscribe } from '../services/geminiService';
 import { configManager } from '../services/configManager';
 import { DownloadIcon, UploadCloudIcon, PlayIcon, PauseIcon, SettingsIcon } from './icons/Icons';
+import { GeminiTranscriber } from './GeminiTranscriber';
 
 // Ultra-detailed logging imports
 import { 

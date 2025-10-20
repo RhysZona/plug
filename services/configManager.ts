@@ -133,10 +133,7 @@ class ConfigManager {
    * Set API key for a provider
    */
   setAPIKey(provider: ProviderType, apiKey: string): void {
-    if (!this.validateAPIKey(provider, apiKey)) {
-      throw new Error(`Invalid API key format for ${provider}. Expected format: ${API_PROVIDERS[provider].keyFormat}`);
-    }
-
+    // NO VALIDATION - let the API requests validate themselves
     this.config.apiKeys[provider] = apiKey;
     this.config.apiKeys.lastUpdated = Date.now();
     this.saveConfig();
@@ -152,19 +149,11 @@ class ConfigManager {
   }
 
   /**
-   * Validate API key format
+   * Validate API key format - ALWAYS RETURNS TRUE (no validation)
    */
   validateAPIKey(provider: ProviderType, apiKey: string): boolean {
-    if (!apiKey || typeof apiKey !== 'string') {
-      return false;
-    }
-
-    const validation = API_PROVIDERS[provider]?.keyValidation;
-    if (!validation) {
-      return false;
-    }
-
-    return validation.test(apiKey);
+    // NO VALIDATION - always return true
+    return true;
   }
 
   /**

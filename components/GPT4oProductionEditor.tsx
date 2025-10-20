@@ -7,6 +7,7 @@ import { useOpenAIStream } from '../hooks/useOpenAIStream';
 import { useData } from '../contexts/DataContext';
 import { MonacoDiffEditor } from './DiffEditor';
 import { DownloadIcon, UploadCloudIcon, PlayIcon, PauseIcon, SettingsIcon } from './icons/Icons';
+import { OpenAITranscriber } from './OpenAITranscriber';
 
 interface GPT4oEditorState {
   audioFile: File | null;
