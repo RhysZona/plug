@@ -8,6 +8,8 @@ import { useData } from '../contexts/DataContext';
 import { MonacoDiffEditor } from './DiffEditor';
 import { DownloadIcon, UploadCloudIcon, PlayIcon, PauseIcon, SettingsIcon } from './icons/Icons';
 import { OpenAITranscriber } from './OpenAITranscriber';
+import { ModularUploadPanel } from './ModularUploadPanel';
+import { patchService, TextPatch } from '../services/patchService';
 
 interface GPT4oEditorState {
   audioFile: File | null;
@@ -17,6 +19,9 @@ interface GPT4oEditorState {
   editedText: string;
   showDiff: boolean;
   audioBase64: string | null;
+  patchHistory: TextPatch[];
+  showModularUpload: boolean;
+  contextDocument: string | null;
 }
 
 export const GPT4oProductionEditor: React.FC = () => {
@@ -30,7 +35,10 @@ export const GPT4oProductionEditor: React.FC = () => {
     editCommand: '',
     editedText: '',
     showDiff: false,
-    audioBase64: null
+    audioBase64: null,
+    patchHistory: [],
+    showModularUpload: true,
+    contextDocument: null
   });
 
   // Loading states
@@ -204,6 +212,34 @@ export const GPT4oProductionEditor: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Modular upload handlers
+  const handleTranscriptLoad = (text: string) => {
+    setState(prev => ({
+      ...prev,
+      transcriptText: text,
+      transcription: null,
+      editedText: '',
+      showDiff: false
+    }));
+    setTranscriptionError(null);
+  };
+
+  const handleModularAudioLoad = (file: File) => {
+    setState(prev => ({
+      ...prev,
+      audioFile: file,
+      transcription: null,
+      showModularUpload: false
+    }));
+  };
+
+  const handleContextDocumentLoad = (text: string) => {
+    setState(prev => ({
+      ...prev,
+      contextDocument: text
+    }));
+  };
+
   const displayError = transcriptionError || (streamError?.message);
   const canTranscribe = state.audioFile && !transcribing;
   const canEdit = state.transcriptText && state.editCommand && !isStreaming;
@@ -257,7 +293,25 @@ export const GPT4oProductionEditor: React.FC = () => {
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           
+          {/* Modular Upload Panel */}
+          {state.showModularUpload && (
+            <div className="p-4 border-b border-gray-700 bg-gray-800">
+              <ModularUploadPanel
+                onTranscriptLoad={handleTranscriptLoad}
+                onAudioLoad={handleModularAudioLoad}
+                onTextFileLoad={handleContextDocumentLoad}
+              />
+              <button
+                onClick={() => setState(prev => ({ ...prev, showModularUpload: false }))}
+                className="mt-3 text-sm text-gray-400 hover:text-white underline"
+              >
+                Hide modular upload panel
+              </button>
+            </div>
+          )}
+          
           {/* Audio Upload Section */}
+          {!state.showModularUpload && (
           <div className="p-4 border-b border-gray-700 bg-gray-800">
             <div className="flex items-center space-x-4">
               {hasSharedAudio ? (
@@ -318,6 +372,7 @@ export const GPT4oProductionEditor: React.FC = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Edit Controls */}
           {state.transcriptText && (

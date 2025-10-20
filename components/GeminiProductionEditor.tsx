@@ -10,6 +10,8 @@ import { transcribe as geminiTranscribe } from '../services/geminiService';
 import { configManager } from '../services/configManager';
 import { DownloadIcon, UploadCloudIcon, PlayIcon, PauseIcon, SettingsIcon } from './icons/Icons';
 import { GeminiTranscriber } from './GeminiTranscriber';
+import { ModularUploadPanel } from './ModularUploadPanel';
+import { patchService, TextPatch } from '../services/patchService';
 
 // Ultra-detailed logging imports
 import { 
@@ -41,6 +43,9 @@ export const GeminiProductionEditor: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [currentMode, setCurrentMode] = useState<'transcribe' | 'edit'>('transcribe');
   const [error, setError] = useState<string | null>(null);
+  const [showModularUpload, setShowModularUpload] = useState(true);
+  const [contextDocument, setContextDocument] = useState<string | null>(null);
+  const [patchHistory, setPatchHistory] = useState<TextPatch[]>([]);
   
   const { startStream, generateContent, isStreaming } = useGeminiStream();
   
@@ -191,6 +196,26 @@ Edit instruction: ${prompt}`
     setStreamingText('');
   }, []);
   
+  // Modular upload handlers
+  const handleTranscriptLoad = (text: string) => {
+    setOriginalText(text);
+    setEditedText('');
+    setStreamingText('');
+    setError(null);
+    setShowModularUpload(false);
+  };
+
+  const handleModularAudioLoad = (file: File) => {
+    // This would trigger audio file handling
+    // For now, we'll just log it
+    console.log('Audio file loaded for Gemini:', file.name);
+    setShowModularUpload(false);
+  };
+
+  const handleContextDocumentLoad = (text: string) => {
+    setContextDocument(text);
+  };
+  
   const predefinedPrompts = [
     'Fix grammar and spelling errors',
     'Improve clarity and readability',
@@ -237,7 +262,25 @@ Edit instruction: ${prompt}`
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Content Area */}
         <div className="flex-1 space-y-6">
+          {/* Modular Upload Panel */}
+          {showModularUpload && (
+            <div className="bg-white border rounded-lg p-4">
+              <ModularUploadPanel
+                onTranscriptLoad={handleTranscriptLoad}
+                onAudioLoad={handleModularAudioLoad}
+                onTextFileLoad={handleContextDocumentLoad}
+              />
+              <button
+                onClick={() => setShowModularUpload(false)}
+                className="mt-3 text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Hide modular upload panel
+              </button>
+            </div>
+          )}
+          
           {/* Shared Audio from Classic Editor */}
+          {!showModularUpload && (
           <div className="bg-white border rounded-lg p-4">
             {audioFile && audioFileName ? (
               <div className="text-center">
@@ -270,7 +313,7 @@ Edit instruction: ${prompt}`
               </div>
             )}
           </div>
-          
+          )}
 
           
           {/* Action Buttons */}

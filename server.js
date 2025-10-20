@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import fs from 'fs';
 import path from 'path';
+import ffmpeg from 'fluent-ffmpeg';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -358,8 +359,39 @@ if (!fs.existsSync(uploadsDir)) {
 
 const diskUpload = multer({ dest: uploadsDir });
 
+// Helper function to convert WAV to MP3 using ffmpeg
+const convertWavToMp3 = (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioCodec('libmp3lame')
+      .audioChannels(1)          // Mono for smaller file size
+      .audioFrequency(16000)     // 16kHz - optimal for speech
+      .audioBitrate('64k')       // Good quality for speech
+      .format('mp3')
+      .on('end', resolve)
+      .on('error', reject)
+      .save(outputPath);
+  });
+};
+
+// Helper function to normalize WAV files
+const normalizeWav = (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioCodec('pcm_s16le')  // 16-bit PCM - most compatible
+      .audioChannels(1)          // Mono
+      .audioFrequency(16000)     // 16kHz
+      .format('wav')
+      .on('end', resolve)
+      .on('error', reject)
+      .save(outputPath);
+  });
+};
+
 // Whisper transcription endpoint
 app.post('/api/openai/transcribe', diskUpload.single('audio'), async (req, res) => {
+  let processedPath = null;
+  
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
@@ -375,7 +407,7 @@ app.post('/api/openai/transcribe', diskUpload.single('audio'), async (req, res) 
     }
 
     const openai = createOpenAIInstance(openaiApiKey);
-    const audioPath = req.file.path;
+    let audioPath = req.file.path;
     
     // Whisper API has 25MB file limit
     const stats = fs.statSync(audioPath);
@@ -399,6 +431,42 @@ app.post('/api/openai/transcribe', diskUpload.single('audio'), async (req, res) 
       });
     }
 
+    // Handle WAV files - convert to MP3 for better compatibility
+    if (req.file.mimetype === 'audio/wav' || req.file.originalname.toLowerCase().endsWith('.wav')) {
+      console.log(`Converting WAV file to MP3: ${req.file.originalname}`);
+      
+      try {
+        // Try converting to MP3 first (more reliable with OpenAI)
+        const mp3Path = `${audioPath}.mp3`;
+        await convertWavToMp3(audioPath, mp3Path);
+        
+        // Clean up original WAV
+        fs.unlinkSync(audioPath);
+        audioPath = mp3Path;
+        processedPath = mp3Path;
+        
+        console.log('Successfully converted WAV to MP3');
+      } catch (ffmpegError) {
+        console.warn('Failed to convert WAV to MP3, trying to normalize WAV instead:', ffmpegError.message);
+        
+        try {
+          // Fallback: normalize the WAV file
+          const normalizedPath = `${audioPath}_normalized.wav`;
+          await normalizeWav(audioPath, normalizedPath);
+          
+          // Clean up original
+          fs.unlinkSync(audioPath);
+          audioPath = normalizedPath;
+          processedPath = normalizedPath;
+          
+          console.log('Successfully normalized WAV file');
+        } catch (normalizeError) {
+          console.error('Failed to process WAV file:', normalizeError);
+          // Continue with original file, might still work
+        }
+      }
+    }
+    
     console.log(`Transcribing audio file: ${req.file.originalname} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`);
     
     const transcription = await retryWithBackoff(async () => {
@@ -420,9 +488,12 @@ app.post('/api/openai/transcribe', diskUpload.single('audio'), async (req, res) 
       duration: transcription.duration || 0
     });
   } catch (error) {
-    // Clean up file in case of error
+    // Clean up files in case of error
     if (req.file?.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
+    }
+    if (processedPath && fs.existsSync(processedPath)) {
+      fs.unlinkSync(processedPath);
     }
     
     console.error('OpenAI Transcription error:', error);
@@ -514,6 +585,115 @@ app.post('/api/openai/stream-edit', async (req, res) => {
       type: 'streaming_error'
     })}\n\n`);
     res.end();
+  }
+});
+
+// Text-only editing endpoint (no transcription needed)
+app.post('/api/openai/edit-text', async (req, res) => {
+  const { text, instruction, model = 'gpt-4o', systemPrompt, temperature = 0.7 } = req.body;
+  
+  try {
+    // Get OpenAI API key from request headers or environment
+    const openaiApiKey = getAPIKey(req, 'OPENAI_API_KEY', ['x-openai-api-key', 'x-api-key']);
+    
+    if (!openaiApiKey) {
+      return res.status(401).json({ 
+        error: 'OpenAI API key required. Please configure in settings or set OPENAI_API_KEY environment variable.' 
+      });
+    }
+
+    const openai = createOpenAIInstance(openaiApiKey);
+    
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt || 'You are a professional text editor. Make the requested changes while preserving the overall structure and meaning.'
+      },
+      {
+        role: 'user',
+        content: `Text to edit:\n\n${text}\n\nInstruction: ${instruction}`
+      }
+    ];
+    
+    console.log(`Text editing with model: ${model}`);
+    
+    const completion = await retryWithBackoff(async () => {
+      return await openai.chat.completions.create({
+        model: model,
+        messages,
+        temperature,
+        max_tokens: 8192
+      });
+    });
+    
+    res.json({
+      original: text,
+      edited: completion.choices[0].message.content,
+      model: model,
+      usage: completion.usage
+    });
+  } catch (error) {
+    console.error('OpenAI Text Edit error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      type: 'text_edit_error'
+    });
+  }
+});
+
+// Gemini text-only editing endpoint
+app.post('/api/gemini/edit-text', async (req, res) => {
+  const { text, instruction, model = 'gemini-2.5-flash', systemPrompt, temperature = 0.7 } = req.body;
+  
+  try {
+    // Get Gemini API key from request headers or environment
+    const geminiApiKey = getAPIKey(req, 'GEMINI_API_KEY', ['x-gemini-api-key', 'x-api-key']);
+    
+    if (!geminiApiKey) {
+      return res.status(401).json({ 
+        error: 'Gemini API key required. Please configure in settings or set GEMINI_API_KEY environment variable.' 
+      });
+    }
+
+    const genAI = createGeminiInstance(geminiApiKey);
+    const geminiModel = genAI.getGenerativeModel({
+      model: model,
+      systemInstruction: systemPrompt || 'You are a professional text editor. Make the requested changes while preserving the overall structure and meaning.'
+    });
+
+    const generationConfig = {
+      temperature,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192
+    };
+
+    const prompt = `Text to edit:\n\n${text}\n\nInstruction: ${instruction}`;
+    
+    console.log(`Gemini text editing with model: ${model}`);
+    
+    const result = await requestQueue.enqueue(() =>
+      retryWithBackoff(async () => {
+        const response = await geminiModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig
+        });
+        return response.response;
+      })
+    );
+    
+    res.json({
+      original: text,
+      edited: result.text(),
+      model: model,
+      usageMetadata: result.usageMetadata
+    });
+  } catch (error) {
+    console.error('Gemini Text Edit error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      type: 'text_edit_error'
+    });
   }
 });
 
