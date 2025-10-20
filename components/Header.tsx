@@ -8,7 +8,9 @@ export const Header: React.FC = memo(() => {
         setChatOpen, 
         setIsSettingsOpen, 
         setIsSpeakerEditorOpen, 
-        setIsTextSpeakerEditorOpen 
+        setIsTextSpeakerEditorOpen,
+        currentTab,
+        setCurrentTab
     } = useUI();
 
     return (
@@ -20,6 +22,30 @@ export const Header: React.FC = memo(() => {
                  <div className="flex items-center space-x-3">
                    <BotIcon className="w-7 h-7 text-brand-blue" />
                     <h1 className="text-xl font-bold text-gray-100 tracking-tight">Gemini Transcription AI Editor</h1>
+                    
+                    {/* Tab Switcher */}
+                    <div className="ml-6 flex bg-gray-700 rounded-md p-1">
+                        <button
+                            onClick={() => setCurrentTab('editor')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                                currentTab === 'editor' 
+                                    ? 'bg-brand-blue text-white' 
+                                    : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                            }`}
+                        >
+                            📝 Classic Editor
+                        </button>
+                        <button
+                            onClick={() => setCurrentTab('gemini')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                                currentTab === 'gemini' 
+                                    ? 'bg-brand-blue text-white' 
+                                    : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                            }`}
+                        >
+                            🤖 Gemini AI
+                        </button>
+                    </div>
                 </div>
             </div>
             <div className="flex items-center space-x-2">

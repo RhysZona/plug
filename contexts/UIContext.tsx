@@ -37,6 +37,7 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSpeakerEditorOpen, setIsSpeakerEditorOpen] = useState(false);
     const [isTextSpeakerEditorOpen, setIsTextSpeakerEditorOpen] = useState(false);
+    const [currentTab, setCurrentTab] = useState<'editor' | 'gemini'>('editor');
 
     const [isTimelineVisible, setIsTimelineVisible] = useState(initialSavedState?.isTimelineVisible ?? true);
     const [isLineNumbersVisible, setIsLineNumbersVisible] = useState(initialSavedState?.isLineNumbersVisible ?? true);
@@ -127,6 +128,7 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         isTimelineVisible, setIsTimelineVisible, isLineNumbersVisible, setIsLineNumbersVisible,
         timelineZoom, setTimelineZoom, textZoom, setTextZoom, volume, setVolume,
         lastPlaybackTime, setLastPlaybackTime, shortcuts, updateShortcuts,
+        currentTab, setCurrentTab,
     };
 
     return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
