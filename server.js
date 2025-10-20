@@ -1,14 +1,17 @@
-// Backend Express server for secure Gemini API proxy
+// Backend Express server for secure Gemini API proxy + OpenAI API proxy
 // Critical: API keys are never exposed to frontend
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import multer from 'multer';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import fs from 'fs';
+import path from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,14 +19,22 @@ const __dirname = dirname(__filename);
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// CRITICAL: API key ONLY on backend
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
+// CRITICAL: API keys ONLY on backend
+const geminiApiKey = process.env.GEMINI_API_KEY;
+const openaiApiKey = process.env.OPENAI_API_KEY;
+
+if (!geminiApiKey) {
   console.error('GEMINI_API_KEY environment variable is required');
   process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+if (!openaiApiKey) {
+  console.error('OPENAI_API_KEY environment variable is required');  
+  process.exit(1);
+}
+
+const genAI = new GoogleGenerativeAI(geminiApiKey);
+const openai = new OpenAI({ apiKey: openaiApiKey });
 
 // CORS configuration
 app.use(cors({
@@ -269,6 +280,187 @@ app.post('/api/generate-content', async (req, res) => {
   }
 });
 
+// ============================================================================
+// OpenAI API Routes (Whisper + GPT-4o Audio Preview)
+// ============================================================================
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+const diskUpload = multer({ dest: uploadsDir });
+
+// Whisper transcription endpoint
+app.post('/api/openai/transcribe', diskUpload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    const audioPath = req.file.path;
+    
+    // Whisper API has 25MB file limit
+    const stats = fs.statSync(audioPath);
+    if (stats.size > 25 * 1024 * 1024) {
+      fs.unlinkSync(audioPath); // Clean up
+      return res.status(413).json({ 
+        error: 'File too large. Maximum 25MB for Whisper API' 
+      });
+    }
+    
+    // Validate audio format
+    const validMimeTypes = [
+      'audio/mp3', 'audio/mpeg', 'audio/wav', 
+      'audio/mp4', 'audio/webm', 'audio/m4a'
+    ];
+    
+    if (!validMimeTypes.includes(req.file.mimetype)) {
+      fs.unlinkSync(audioPath); // Clean up
+      return res.status(400).json({
+        error: `Unsupported format: ${req.file.mimetype}. Use MP3, WAV, MP4, or WEBM.`
+      });
+    }
+
+    console.log(`Transcribing audio file: ${req.file.originalname} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`);
+    
+    const transcription = await retryWithBackoff(async () => {
+      return await openai.audio.transcriptions.create({
+        file: fs.createReadStream(audioPath),
+        model: 'whisper-1',
+        language: req.body.language || 'en',
+        response_format: 'verbose_json',
+        timestamp_granularities: ['word']
+      });
+    });
+    
+    // Clean up uploaded file
+    fs.unlinkSync(audioPath);
+    
+    res.json({
+      transcript: transcription.text,
+      segments: transcription.words || [],
+      duration: transcription.duration || 0
+    });
+  } catch (error) {
+    // Clean up file in case of error
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    console.error('OpenAI Transcription error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      type: 'transcription_error'
+    });
+  }
+});
+
+// GPT-4o Audio Preview streaming endpoint
+app.post('/api/openai/stream-edit', async (req, res) => {
+  const { transcript, editCommand, audioBase64, config } = req.body;
+  
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  try {
+    const messages = [
+      {
+        role: 'system',
+        content: config.systemInstruction || 'You are a professional text editor. Generate unified diff format changes.'
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: `Original transcript: ${transcript}` },
+          { type: 'text', text: `Edit command: ${editCommand}` }
+        ]
+      }
+    ];
+    
+    // Add audio context if provided (for GPT-4o audio preview)
+    if (audioBase64 && config.model === 'gpt-4o-audio-preview') {
+      messages[1].content.push({
+        type: 'input_audio',
+        input_audio: {
+          data: audioBase64,
+          format: 'wav'
+        }
+      });
+    }
+    
+    console.log(`Streaming edit with model: ${config.model || 'gpt-4o-audio-preview'}`);
+    
+    const stream = await retryWithBackoff(async () => {
+      return await openai.chat.completions.create({
+        model: config.model || 'gpt-4o-audio-preview',
+        modalities: config.modalities || ['text'],
+        messages,
+        temperature: config.temperature || 0.7,
+        max_tokens: config.maxTokens || 4096,
+        stream: true,
+        ...(config.topP && { top_p: config.topP }),
+        ...(config.frequencyPenalty && { frequency_penalty: config.frequencyPenalty }),
+        ...(config.presencePenalty && { presence_penalty: config.presencePenalty })
+      });
+    });
+    
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
+      }
+    }
+    
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('OpenAI Streaming error:', error);
+    res.write(`data: ${JSON.stringify({ 
+      error: error.message,
+      type: 'streaming_error'
+    })}\n\n`);
+    res.end();
+  }
+});
+
+// OpenAI models endpoint
+app.get('/api/openai/models', async (req, res) => {
+  try {
+    const models = [
+      {
+        id: 'gpt-4o-audio-preview',
+        name: 'GPT-4o Audio Preview',
+        contextWindow: 128000,
+        audioSupport: true,
+        description: 'Latest multimodal model with audio input/output'
+      },
+      {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        contextWindow: 128000,
+        audioSupport: false,
+        description: 'Flagship text model'
+      },
+      {
+        id: 'gpt-4o-mini',
+        name: 'GPT-4o Mini',
+        contextWindow: 128000,
+        audioSupport: false,
+        description: 'Fast and affordable'
+      }
+    ];
+    
+    res.json({ models });
+  } catch (error) {
+    console.error('Models endpoint error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -276,7 +468,8 @@ app.get('/api/health', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`🚀 Gemini API proxy server running on port ${PORT}`);
+  console.log(`🚀 Gemini + OpenAI API proxy server running on port ${PORT}`);
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  console.log(`API Key configured: ${apiKey ? 'Yes' : 'No'}`);
+  console.log(`Gemini API Key configured: ${geminiApiKey ? 'Yes' : 'No'}`);
+  console.log(`OpenAI API Key configured: ${openaiApiKey ? 'Yes' : 'No'}`);
 });

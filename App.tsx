@@ -7,6 +7,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { SpeakerEditorModal } from './components/SpeakerEditorModal';
 import { TextSpeakerEditorModal } from './components/TextSpeakerEditorModal';
 import { GeminiProductionEditor } from './components/GeminiProductionEditor';
+import { GPT4oProductionEditor } from './components/GPT4oProductionEditor';
 import { DataProvider, useData } from './contexts/DataContext';
 import { UIProvider, useUI } from './contexts/UIContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
@@ -58,6 +59,9 @@ const AppContent: React.FC = () => {
                     )}
                     {currentTab === 'gemini' && (
                         <GeminiProductionEditor />
+                    )}
+                    {currentTab === 'gpt4o' && (
+                        <GPT4oProductionEditor />
                     )}
                 </div>
             </main>

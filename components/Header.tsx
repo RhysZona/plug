@@ -45,6 +45,16 @@ export const Header: React.FC = memo(() => {
                         >
                             🤖 Gemini AI
                         </button>
+                        <button
+                            onClick={() => setCurrentTab('gpt4o')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                                currentTab === 'gpt4o' 
+                                    ? 'bg-brand-blue text-white' 
+                                    : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                            }`}
+                        >
+                            🧠 GPT-4o
+                        </button>
                     </div>
                 </div>
             </div>
