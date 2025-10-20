@@ -557,6 +557,25 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Detailed health check endpoint with system info
+app.get('/api/health/detailed', (req, res) => {
+  console.log('🔍 Detailed health check requested');
+  
+  const healthStatus = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    version: process.version,
+    platform: process.platform,
+    env: process.env.NODE_ENV || 'development',
+    port: PORT,
+    corsOrigins: ['http://localhost:3000', 'http://localhost:5173']
+  };
+  
+  res.json(healthStatus);
+});
+
 // Enhanced error handling middleware (based on research)
 app.use((err, req, res, next) => {
   const timestamp = new Date().toISOString();
