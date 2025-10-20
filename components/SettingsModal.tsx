@@ -47,10 +47,7 @@ export const SettingsModal: React.FC = () => {
     
     if (!isSettingsOpen) return null;
 
-    const handleAPIKeysClick = () => {
-        setShowAPIKeySettings(true);
-        setIsSettingsOpen(false);
-    };
+
     
     return (
         <>
@@ -108,7 +105,7 @@ export const SettingsModal: React.FC = () => {
                                         Keys are stored securely in your browser's local storage.
                                     </p>
                                     <button
-                                        onClick={handleAPIKeysClick}
+                                        onClick={() => setShowAPIKeySettings(true)}
                                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
                                     >
                                         Configure API Keys
