@@ -1,7 +1,13 @@
 // Backend Express server for secure Gemini API proxy + OpenAI API proxy
-// Critical: API keys are never exposed to frontend
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+// Critical: API keys can be provided via headers or environment variables
+
+// Optional environment variable loading (for backward compatibility)
+try {
+  const dotenv = await import('dotenv');
+  dotenv.config({ path: '.env.local' });
+} catch (error) {
+  console.log('dotenv not available, using only request headers for API keys');
+}
 
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -19,22 +25,38 @@ const __dirname = dirname(__filename);
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// CRITICAL: API keys ONLY on backend
-const geminiApiKey = process.env.GEMINI_API_KEY;
-const openaiApiKey = process.env.OPENAI_API_KEY;
+// Helper function to get API key from request or environment
+const getAPIKey = (req, envVarName, headerNames) => {
+  // First try to get from headers
+  for (const headerName of headerNames) {
+    if (req.headers[headerName]) {
+      return req.headers[headerName];
+    }
+  }
+  
+  // Fallback to environment variable
+  return process.env[envVarName];
+};
 
-if (!geminiApiKey) {
-  console.error('GEMINI_API_KEY environment variable is required');
-  process.exit(1);
-}
+// Helper function to create AI instances with dynamic API keys
+const createGeminiInstance = (apiKey) => {
+  if (!apiKey) return null;
+  return new GoogleGenerativeAI(apiKey);
+};
 
-if (!openaiApiKey) {
-  console.error('OPENAI_API_KEY environment variable is required');  
-  process.exit(1);
-}
+const createOpenAIInstance = (apiKey) => {
+  if (!apiKey) return null;
+  return new OpenAI({ apiKey });
+};
 
-const genAI = new GoogleGenerativeAI(geminiApiKey);
-const openai = new OpenAI({ apiKey: openaiApiKey });
+// Legacy fallback: Default API keys from environment (for backward compatibility)
+const defaultGeminiApiKey = process.env.GEMINI_API_KEY;
+const defaultOpenaiApiKey = process.env.OPENAI_API_KEY;
+
+console.log('🔧 API Key Configuration:');
+console.log(`  Gemini (env): ${defaultGeminiApiKey ? 'Configured' : 'Not set'}`);
+console.log(`  OpenAI (env): ${defaultOpenaiApiKey ? 'Configured' : 'Not set'}`);
+console.log('  Note: API keys can also be provided via request headers');
 
 // CORS configuration
 app.use(cors({
@@ -123,6 +145,16 @@ app.post('/api/upload-audio', upload.single('audio'), async (req, res) => {
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
+    // Get Gemini API key from request headers or environment
+    const geminiApiKey = getAPIKey(req, 'GEMINI_API_KEY', ['x-gemini-api-key', 'x-api-key']);
+    
+    if (!geminiApiKey) {
+      return res.status(401).json({ 
+        error: 'Gemini API key required. Please configure in settings or set GEMINI_API_KEY environment variable.' 
+      });
+    }
+
+    const genAI = createGeminiInstance(geminiApiKey);
     const audioBuffer = req.file.buffer;
     
     // Upload to Gemini Files API with retry logic
@@ -137,7 +169,7 @@ app.post('/api/upload-audio', upload.single('audio'), async (req, res) => {
     );
     
     // Wait for file to be processed
-    await waitForFileActive(uploadedFile.file.name);
+    await waitForFileActive(uploadedFile.file.name, genAI);
     
     res.json({
       fileUri: uploadedFile.file.uri,
@@ -151,7 +183,7 @@ app.post('/api/upload-audio', upload.single('audio'), async (req, res) => {
 });
 
 // Wait for file to be in ACTIVE state
-const waitForFileActive = async (fileName) => {
+const waitForFileActive = async (fileName, genAI) => {
   const fileManager = genAI.fileManager;
   let file = await fileManager.getFile(fileName);
   
@@ -234,6 +266,17 @@ app.post('/api/generate-content', async (req, res) => {
   const { fileUri, prompt, systemInstruction, config } = req.body;
   
   try {
+    // Get Gemini API key from request headers or environment
+    const geminiApiKey = getAPIKey(req, 'GEMINI_API_KEY', ['x-gemini-api-key', 'x-api-key']);
+    
+    if (!geminiApiKey) {
+      return res.status(401).json({ 
+        error: 'Gemini API key required. Please configure in settings or set GEMINI_API_KEY environment variable.' 
+      });
+    }
+
+    const genAI = createGeminiInstance(geminiApiKey);
+    
     const result = await requestQueue.enqueue(() =>
       retryWithBackoff(async () => {
         const model = genAI.getGenerativeModel({
@@ -299,6 +342,16 @@ app.post('/api/openai/transcribe', diskUpload.single('audio'), async (req, res) 
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
+    // Get OpenAI API key from request headers or environment
+    const openaiApiKey = getAPIKey(req, 'OPENAI_API_KEY', ['x-openai-api-key', 'x-api-key']);
+    
+    if (!openaiApiKey) {
+      return res.status(401).json({ 
+        error: 'OpenAI API key required. Please configure in settings or set OPENAI_API_KEY environment variable.' 
+      });
+    }
+
+    const openai = createOpenAIInstance(openaiApiKey);
     const audioPath = req.file.path;
     
     // Whisper API has 25MB file limit
@@ -367,6 +420,20 @@ app.post('/api/openai/stream-edit', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
   try {
+    // Get OpenAI API key from request headers or environment
+    const openaiApiKey = getAPIKey(req, 'OPENAI_API_KEY', ['x-openai-api-key', 'x-api-key']);
+    
+    if (!openaiApiKey) {
+      res.write(`data: ${JSON.stringify({ 
+        error: 'OpenAI API key required. Please configure in settings or set OPENAI_API_KEY environment variable.',
+        type: 'auth_error'
+      })}\\n\\n`);
+      res.end();
+      return;
+    }
+
+    const openai = createOpenAIInstance(openaiApiKey);
+    
     const messages = [
       {
         role: 'system',

@@ -212,9 +212,9 @@ Edit instruction: ${prompt}`
         </div>
       )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Panel - Controls */}
-        <div className="lg:col-span-1 space-y-6">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Content Area */}
+        <div className="flex-1 space-y-6">
           {/* Shared Audio from Classic Editor */}
           <div className="bg-white border rounded-lg p-4">
             {audioFile && audioFileName ? (
@@ -249,12 +249,7 @@ Edit instruction: ${prompt}`
             )}
           </div>
           
-          {/* Model Configuration */}
-          <ModelConfigPanel
-            config={config}
-            onConfigChange={setConfig}
-            disabled={isStreaming || isTranscribing}
-          />
+
           
           {/* Action Buttons */}
           <div className="bg-white border rounded-lg p-4 space-y-3">
@@ -316,8 +311,14 @@ Edit instruction: ${prompt}`
           </div>
         </div>
         
-        {/* Right Panel - Content */}
-        <div className="lg:col-span-2">
+        {/* Right Panel - Configuration & Results */}
+        <div className="lg:w-96 space-y-6">
+          {/* Model Configuration */}
+          <ModelConfigPanel
+            config={config}
+            onConfigChange={setConfig}
+            disabled={isStreaming || isTranscribing}
+          />
           {/* Streaming Preview */}
           {isStreaming && streamingText && (
             <div className="mb-6">
