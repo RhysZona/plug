@@ -49,6 +49,9 @@ export const ModelConfigPanel: React.FC<ModelConfigPanelProps> = ({
   disabled = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showBasicSettings, setShowBasicSettings] = useState(true);
+  const [showSystemInstructions, setShowSystemInstructions] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [activePreset, setActivePreset] = useState<keyof typeof systemInstructions>('custom');
 
   const updateConfig = <K extends keyof GeminiConfig>(field: K, value: GeminiConfig[K]) => {
@@ -74,224 +77,223 @@ export const ModelConfigPanel: React.FC<ModelConfigPanelProps> = ({
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700">
       <div 
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-750 transition-colors"
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-750 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center space-x-3">
-          <div className="text-lg">⚙️</div>
+        <div className="flex items-center space-x-2">
+          <div className="text-sm">⚙️</div>
           <div>
-            <h3 className="text-lg font-medium text-gray-200">Model Configuration</h3>
-            <p className="text-sm text-gray-400">
-              {config.model} • Temp: {config.temperature} • Tokens: {config.maxOutputTokens}
+            <h3 className="text-sm font-medium text-gray-200">Model Config</h3>
+            <p className="text-xs text-gray-400">
+              {availableModels.find(m => m.value === config.model)?.label || config.model} • T:{config.temperature} • {config.maxOutputTokens}
             </p>
           </div>
         </div>
-        <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+        <div className={`transform transition-transform text-xs text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}>
           ▼
         </div>
       </div>
 
       {isExpanded && (
-        <div className="p-4 border-t border-gray-700 space-y-6">
+        <div className="border-t border-gray-700">
           
-          {/* Model Selection */}
+          {/* Basic Settings Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Model
-            </label>
-            <select
-              value={config.model}
-              onChange={(e) => updateConfig('model', e.target.value)}
-              disabled={disabled}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+            <div 
+              className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-750 transition-colors border-b border-gray-700"
+              onClick={() => setShowBasicSettings(!showBasicSettings)}
             >
-              {availableModels.map(model => (
-                <option key={model.value} value={model.value}>
-                  {model.label} - {model.description}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Temperature */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-300">
-                Temperature
-              </label>
-              <span className="text-sm text-brand-blue font-medium">
-                {config.temperature}
-              </span>
+              <h4 className="text-sm font-medium text-gray-300">Basic Settings</h4>
+              <div className={`transform transition-transform text-xs text-gray-400 ${showBasicSettings ? 'rotate-180' : ''}`}>
+                ▼
+              </div>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={config.temperature}
-              onChange={(e) => updateConfig('temperature', parseFloat(e.target.value))}
-              disabled={disabled}
-              className="w-full slider"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Conservative (0)</span>
-              <span>Creative (2)</span>
-            </div>
-          </div>
-
-          {/* Top-P */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-300">
-                Top-P (Nucleus Sampling)
-              </label>
-              <span className="text-sm text-brand-blue font-medium">
-                {config.topP}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={config.topP}
-              onChange={(e) => updateConfig('topP', parseFloat(e.target.value))}
-              disabled={disabled}
-              className="w-full slider"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Focused (0)</span>
-              <span>Diverse (1)</span>
-            </div>
-          </div>
-
-          {/* Top-K */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-300">
-                Top-K
-              </label>
-              <span className="text-sm text-brand-blue font-medium">
-                {config.topK}
-              </span>
-            </div>
-            <input
-              type="number"
-              min="1"
-              max="40"
-              value={config.topK}
-              onChange={(e) => updateConfig('topK', parseInt(e.target.value) || 1)}
-              disabled={disabled}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Number of candidate tokens to consider (1-40)
-            </p>
-          </div>
-
-          {/* Max Output Tokens */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Max Output Tokens
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {tokenOptions.map(tokens => (
-                <button
-                  key={tokens}
-                  onClick={() => updateConfig('maxOutputTokens', tokens)}
-                  disabled={disabled}
-                  className={`
-                    px-3 py-2 rounded text-sm font-medium transition-colors
-                    ${config.maxOutputTokens === tokens
-                      ? 'bg-brand-blue text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  `}
-                >
-                  {tokens}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* System Instruction Presets */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              System Instruction Preset
-            </label>
-            <select
-              value={activePreset}
-              onChange={(e) => handlePresetChange(e.target.value as keyof typeof systemInstructions)}
-              disabled={disabled}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50 mb-3"
-            >
-              <option value="transcriber">📝 Expert Transcriber</option>
-              <option value="transcriptionEditor">✏️ Transcript Editor (Diff Format)</option>
-              <option value="jsonFormatter">🔧 JSON Formatter</option>
-              <option value="codeReviewer">👀 Code Reviewer</option>
-              <option value="custom">✨ Custom Instructions</option>
-            </select>
-
-            {/* System Instruction Textarea */}
-            <textarea
-              value={typeof config.systemInstruction === 'string' ? config.systemInstruction : config.systemInstruction.join('\n')}
-              onChange={(e) => handleSystemInstructionChange(e.target.value)}
-              disabled={disabled}
-              rows={6}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50 font-mono text-sm"
-              placeholder="Enter your custom system instructions here..."
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Define the AI's behavior, role, and output format
-            </p>
-          </div>
-
-          {/* Advanced Settings */}
-          <div className="pt-4 border-t border-gray-700">
-            <h4 className="text-sm font-medium text-gray-300 mb-3">Advanced Settings</h4>
             
-            {/* Response MIME Type */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Response Format
-              </label>
-              <select
-                value={config.responseMimeType || ''}
-                onChange={(e) => updateConfig('responseMimeType', e.target.value || undefined)}
-                disabled={disabled}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
-              >
-                <option value="">Auto (Default)</option>
-                <option value="application/json">JSON</option>
-                <option value="text/plain">Plain Text</option>
-                <option value="text/markdown">Markdown</option>
-              </select>
-            </div>
+            {showBasicSettings && (
+              <div className="p-4 space-y-4">
+                {/* Model Selection */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
+                    Model
+                  </label>
+                  <select
+                    value={config.model}
+                    onChange={(e) => updateConfig('model', e.target.value)}
+                    disabled={disabled}
+                    className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                  >
+                    {availableModels.map(model => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Stop Sequences */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Stop Sequences (comma-separated)
-              </label>
-              <input
-                type="text"
-                value={config.stopSequences?.join(', ') || ''}
-                onChange={(e) => {
-                  const sequences = e.target.value
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(s => s.length > 0);
-                  updateConfig('stopSequences', sequences.length > 0 ? sequences : undefined);
-                }}
-                disabled={disabled}
-                placeholder="e.g., END, STOP, ###"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Stop generation when these strings are encountered
-              </p>
+                {/* Temperature & Tokens in one row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-medium text-gray-400">Temperature</label>
+                      <span className="text-xs text-brand-blue font-medium">{config.temperature}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={config.temperature}
+                      onChange={(e) => updateConfig('temperature', parseFloat(e.target.value))}
+                      disabled={disabled}
+                      className="w-full slider"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Max Tokens</label>
+                    <select
+                      value={config.maxOutputTokens}
+                      onChange={(e) => updateConfig('maxOutputTokens', parseInt(e.target.value))}
+                      disabled={disabled}
+                      className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                    >
+                      {tokenOptions.map(tokens => (
+                        <option key={tokens} value={tokens}>{tokens}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Top-P and Top-K in one row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-medium text-gray-400">Top-P</label>
+                      <span className="text-xs text-brand-blue font-medium">{config.topP}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={config.topP}
+                      onChange={(e) => updateConfig('topP', parseFloat(e.target.value))}
+                      disabled={disabled}
+                      className="w-full slider"
+                    />
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-medium text-gray-400">Top-K</label>
+                      <span className="text-xs text-brand-blue font-medium">{config.topK}</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      max="40"
+                      value={config.topK}
+                      onChange={(e) => updateConfig('topK', parseInt(e.target.value) || 1)}
+                      disabled={disabled}
+                      className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* System Instructions Section */}
+          <div>
+            <div 
+              className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-750 transition-colors border-b border-gray-700"
+              onClick={() => setShowSystemInstructions(!showSystemInstructions)}
+            >
+              <h4 className="text-sm font-medium text-gray-300">System Instructions</h4>
+              <div className={`transform transition-transform text-xs text-gray-400 ${showSystemInstructions ? 'rotate-180' : ''}`}>
+                ▼
+              </div>
             </div>
+            
+            {showSystemInstructions && (
+              <div className="p-4 space-y-3">
+                {/* Preset Selection */}
+                <select
+                  value={activePreset}
+                  onChange={(e) => handlePresetChange(e.target.value as keyof typeof systemInstructions)}
+                  disabled={disabled}
+                  className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                >
+                  <option value="transcriber">📝 Expert Transcriber</option>
+                  <option value="transcriptionEditor">✏️ Transcript Editor</option>
+                  <option value="jsonFormatter">🔧 JSON Formatter</option>
+                  <option value="codeReviewer">👀 Code Reviewer</option>
+                  <option value="custom">✨ Custom Instructions</option>
+                </select>
+
+                {/* System Instruction Textarea */}
+                <textarea
+                  value={typeof config.systemInstruction === 'string' ? config.systemInstruction : config.systemInstruction.join('\n')}
+                  onChange={(e) => handleSystemInstructionChange(e.target.value)}
+                  disabled={disabled}
+                  rows={4}
+                  className="w-full px-2 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50 font-mono"
+                  placeholder="Define AI behavior and output format..."
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Advanced Settings Section */}
+          <div>
+            <div 
+              className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-750 transition-colors"
+              onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+            >
+              <h4 className="text-sm font-medium text-gray-300">Advanced Settings</h4>
+              <div className={`transform transition-transform text-xs text-gray-400 ${showAdvancedSettings ? 'rotate-180' : ''}`}>
+                ▼
+              </div>
+            </div>
+            
+            {showAdvancedSettings && (
+              <div className="p-4 space-y-3">
+                {/* Response Format */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Response Format</label>
+                  <select
+                    value={config.responseMimeType || ''}
+                    onChange={(e) => updateConfig('responseMimeType', e.target.value || undefined)}
+                    disabled={disabled}
+                    className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                  >
+                    <option value="">Auto</option>
+                    <option value="application/json">JSON</option>
+                    <option value="text/plain">Plain Text</option>
+                    <option value="text/markdown">Markdown</option>
+                  </select>
+                </div>
+
+                {/* Stop Sequences */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Stop Sequences</label>
+                  <input
+                    type="text"
+                    value={config.stopSequences?.join(', ') || ''}
+                    onChange={(e) => {
+                      const sequences = e.target.value
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0);
+                      updateConfig('stopSequences', sequences.length > 0 ? sequences : undefined);
+                    }}
+                    disabled={disabled}
+                    placeholder="END, STOP, ###"
+                    className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

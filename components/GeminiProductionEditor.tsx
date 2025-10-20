@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { AudioUploader } from './AudioUploader';
 import { ModelConfigPanel } from './ModelConfigPanel';
 import { MonacoDiffEditor } from './DiffEditor';
 import { useGeminiStream, type GeminiConfig } from '../hooks/useGeminiStream';
+import { useData } from '../contexts/DataContext';
 
 interface UploadedAudio {
   fileUri: string;
@@ -11,7 +11,8 @@ interface UploadedAudio {
 }
 
 export const GeminiProductionEditor: React.FC = () => {
-  const [audioFile, setAudioFile] = useState<UploadedAudio | null>(null);
+  const { audioFile, audioFileName, audioSrc } = useData();
+  const [uploadedAudioFile, setUploadedAudioFile] = useState<UploadedAudio | null>(null);
   const [config, setConfig] = useState<GeminiConfig>({
     model: 'gemini-2.5-pro',
     systemInstruction: 'You are an expert transcriber. Generate accurate transcripts with proper punctuation, capitalization, and paragraph breaks. Include speaker labels when multiple speakers are present.',
@@ -30,10 +31,7 @@ export const GeminiProductionEditor: React.FC = () => {
   
   const { startStream, generateContent, isStreaming } = useGeminiStream();
   
-  const handleAudioUpload = useCallback((audio: UploadedAudio) => {
-    setAudioFile(audio);
-    setError(null);
-  }, []);
+
   
   const handleTranscribe = useCallback(async () => {
     if (!audioFile) return;
@@ -45,16 +43,36 @@ export const GeminiProductionEditor: React.FC = () => {
     setCurrentMode('transcribe');
     
     try {
+      // First upload the audio file to get the URI
+      const formData = new FormData();
+      formData.append('audio', audioFile);
+
+      const uploadResponse = await fetch('http://localhost:3001/api/upload-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(`Audio upload failed: ${errorData.error || uploadResponse.statusText}`);
+      }
+
+      const { fileUri } = await uploadResponse.json();
+      setUploadedAudioFile({ fileUri, fileName: audioFileName || 'audio', mimeType: audioFile.type });
+
+      // Now transcribe using the uploaded file URI
+      let accumulatedText = '';
       await startStream(
         'Generate a detailed transcript of this audio file. Include speaker labels if multiple speakers are present. Use proper punctuation and paragraph breaks.',
         config,
         {
           onChunk: (text) => {
-            setStreamingText(prev => prev + text);
+            accumulatedText += text;
+            setStreamingText(accumulatedText);
           },
           onComplete: () => {
             console.log('Transcription complete');
-            setOriginalText(streamingText);
+            setOriginalText(accumulatedText);
             setStreamingText('');
             setIsTranscribing(false);
           },
@@ -65,7 +83,7 @@ export const GeminiProductionEditor: React.FC = () => {
             setStreamingText('');
           }
         },
-        audioFile.fileUri
+        fileUri
       );
     } catch (error) {
       console.error('Transcription error:', error);
@@ -73,7 +91,7 @@ export const GeminiProductionEditor: React.FC = () => {
       setIsTranscribing(false);
       setStreamingText('');
     }
-  }, [audioFile, config, startStream, streamingText]);
+  }, [audioFile, audioFileName, config, startStream]);
   
   const handleEdit = useCallback(async () => {
     if (!originalText || !prompt.trim()) return;
@@ -119,7 +137,7 @@ Edit instruction: ${prompt}`
             setStreamingText('');
           }
         },
-        audioFile?.fileUri
+        uploadedAudioFile?.fileUri
       );
     } catch (error) {
       console.error('Edit error:', error);
@@ -186,19 +204,35 @@ Edit instruction: ${prompt}`
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Controls */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Audio Upload */}
+          {/* Shared Audio from Classic Editor */}
           <div className="bg-white border rounded-lg p-4">
-            <AudioUploader 
-              onUploadComplete={handleAudioUpload}
-              disabled={isStreaming || isTranscribing}
-            />
-            {audioFile && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-                <p className="text-sm text-green-700">
-                  ✅ <strong>{audioFile.fileName}</strong> uploaded successfully
+            {audioFile && audioFileName ? (
+              <div className="text-center">
+                <div className="text-4xl mb-4">🎵</div>
+                <div className="text-lg font-medium text-gray-900 mb-2">
+                  Audio Ready
+                </div>
+                <div className="p-3 bg-green-50 border border-green-200 rounded">
+                  <p className="text-sm text-green-700">
+                    ✅ <strong>{audioFileName}</strong>
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Shared from Classic Editor
+                  </p>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Upload audio files in the Classic Editor tab to use here
                 </p>
-                <p className="text-xs text-green-600 mt-1">
-                  Type: {audioFile.mimeType}
+              </div>
+            ) : (
+              <div className="text-center p-8 text-gray-500">
+                <div className="text-4xl mb-4">📁</div>
+                <div className="text-lg font-medium text-gray-600 mb-2">
+                  No Audio File
+                </div>
+                <p className="text-sm text-gray-500">
+                  Switch to the <strong>Classic Editor</strong> tab to upload an audio file, 
+                  then return here to transcribe with AI.
                 </p>
               </div>
             )}

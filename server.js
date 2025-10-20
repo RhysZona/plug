@@ -1,5 +1,8 @@
 // Backend Express server for secure Gemini API proxy
 // Critical: API keys are never exposed to frontend
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import multer from 'multer';
