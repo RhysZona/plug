@@ -92,11 +92,23 @@ const EditableParagraph: React.FC<{
 
     // Auto-focus the textarea when it mounts.
     useEffect(() => {
-        textareaRef.current?.focus();
-        // For new paragraphs (created from Enter key), place cursor at start
-        // For existing paragraphs, place cursor at end
-        const cursorPosition = isNewParagraph ? 0 : text.length;
-        textareaRef.current?.setSelectionRange(cursorPosition, cursorPosition);
+        if (textareaRef.current) {
+            textareaRef.current.focus();
+            // For new paragraphs (created from Enter key), place cursor at start
+            // For existing paragraphs, place cursor at end
+            const cursorPosition = isNewParagraph ? 0 : text.length;
+            textareaRef.current.setSelectionRange(cursorPosition, cursorPosition);
+            
+            // Prevent container from scrolling by maintaining the current scroll position
+            const container = textareaRef.current.closest('.transcript-editor-view');
+            if (container) {
+                const scrollTop = container.scrollTop;
+                // Use requestAnimationFrame to ensure DOM updates are complete
+                requestAnimationFrame(() => {
+                    container.scrollTop = scrollTop;
+                });
+            }
+        }
     }, [isNewParagraph, text.length]);
 
     const handleBlur = () => {

@@ -1,9 +1,19 @@
-// import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { MatchedWord } from '../types';
 
 // Initialize the Google Gemini API client.
-// The API key is sourced from the environment variable `process.env.API_KEY`.
-// const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// The API key is sourced from the environment variable `VITE_GEMINI_API_KEY`.
+const getApiKey = () => {
+    const key = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!key) {
+        console.warn("VITE_GEMINI_API_KEY environment variable is not set. Gemini features will be disabled.");
+        return null;
+    }
+    return key;
+};
+
+const apiKey = getApiKey();
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // Helper function to convert a File object to a GoogleGenAI.Part object.
 async function fileToGenerativePart(file: File): Promise<{
@@ -36,18 +46,31 @@ async function fileToGenerativePart(file: File): Promise<{
  * @returns {Promise<string>} The transcribed text.
  */
 export const transcribe = async (file: File, prompt: string): Promise<string> => {
-    console.log("Gemini transcribe service is currently disabled for testing.");
-    // const audioPart = await fileToGenerativePart(file);
-    // const textPart = { text: `Transcribe this audio. ${prompt}` };
+    if (!genAI) {
+        throw new Error("Gemini API is not configured. Please set the VITE_GEMINI_API_KEY environment variable.");
+    }
 
-    // // FIX: Using gemini-2.5-pro for higher quality transcription of audio files.
-    // const response = await ai.models.generateContent({
-    //     model: 'gemini-2.5-pro',
-    //     contents: { parts: [audioPart, textPart] },
-    // });
-    
-    // return response.text;
-    return Promise.resolve("Transcription is currently disabled for testing purposes.");
+    try {
+        const audioPart = await fileToGenerativePart(file);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        
+        const result = await model.generateContent([
+            { text: `Transcribe this audio file. ${prompt}` },
+            audioPart,
+        ]);
+        
+        const response = await result.response;
+        const text = response.text();
+        
+        if (!text || text.trim().length === 0) {
+            throw new Error("Received empty response from Gemini API");
+        }
+        
+        return text.trim();
+    } catch (error) {
+        console.error("Error in transcribe function:", error);
+        throw new Error(`Transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 };
 
 /**
@@ -57,34 +80,42 @@ export const transcribe = async (file: File, prompt: string): Promise<string> =>
  * @returns {Promise<MatchedWord[]>} A new array of words representing the edited transcript.
  */
 export const edit = async (words: MatchedWord[], systemPrompt: string): Promise<MatchedWord[]> => {
-    console.log("Gemini edit service is currently disabled for testing.");
+    if (!genAI) {
+        throw new Error("Gemini API is not configured. Please set the VITE_GEMINI_API_KEY environment variable.");
+    }
+    
     if (words.length === 0) {
         return Promise.resolve([]);
     }
 
-    // const transcriptText = words.map(w => w.punctuated_word).join(' ');
+    try {
+        const transcriptText = words.map(w => w.punctuated_word).join(' ');
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash",
+            systemInstruction: `${systemPrompt}. Respond only with the edited transcript text. Do not add any explanation or comments.`
+        });
 
-    // // FIX: Using gemini-2.5-flash for efficient text editing tasks with a system instruction.
-    // const response = await ai.models.generateContent({
-    //     model: 'gemini-2.5-flash',
-    //     contents: transcriptText,
-    //     config: {
-    //         systemInstruction: `${systemPrompt}. Respond only with the edited transcript text.`,
-    //     },
-    // });
+        const result = await model.generateContent([transcriptText]);
+        const response = await result.response;
+        const editedText = response.text();
 
-    // const editedText = response.text;
+        if (!editedText || editedText.trim().length === 0) {
+            throw new Error("Received empty response from Gemini API");
+        }
 
-    // // Convert the edited text back into the MatchedWord structure.
-    // // Timestamps are lost in this process and will be null.
-    // const newWords: MatchedWord[] = editedText.split(/\s+/).filter(w => w).map((word, i) => ({
-    //     number: i + 1,
-    //     punctuated_word: word,
-    //     cleaned_word: word.toLowerCase().replace(/[.,!?]/g, ''),
-    //     start: null,
-    //     end: null
-    // }));
+        // Convert the edited text back into the MatchedWord structure.
+        // Timestamps are lost in this process and will be null.
+        const newWords: MatchedWord[] = editedText.trim().split(/\s+/).filter(w => w).map((word, i) => ({
+            number: i + 1,
+            punctuated_word: word,
+            cleaned_word: word.toLowerCase().replace(/[.,!?]/g, ''),
+            start: null,
+            end: null
+        }));
 
-    // return newWords;
-    return Promise.resolve(words); // Return original words
+        return newWords;
+    } catch (error) {
+        console.error("Error in edit function:", error);
+        throw new Error(`Edit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 };
