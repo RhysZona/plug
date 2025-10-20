@@ -183,16 +183,17 @@ export const Editor: React.FC = () => {
         if (audioRef.current && time !== null) {
             const audio = audioRef.current;
             audio.currentTime = time;
-            if (audio.paused) {
-                 const playPromise = audio.play();
-                 if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        if (error.name !== 'AbortError') {
-                            console.error('Audio playback failed on seek:', error);
-                        }
-                    });
-                }
-            }
+            // REMOVED: Auto-play behavior when paused - allow seeking during playback without interruption
+            // if (audio.paused) {
+            //      const playPromise = audio.play();
+            //      if (playPromise !== undefined) {
+            //         playPromise.catch(error => {
+            //             if (error.name !== 'AbortError') {
+            //                 console.error('Audio playback failed on seek:', error);
+            //             }
+            //         });
+            //     }
+            // }
         }
     };
     
@@ -293,10 +294,11 @@ export const Editor: React.FC = () => {
     }, [searchQuery, replaceQuery, currentTranscript, setTranscript]);
     
     const handleEditStart = useCallback(() => {
-        if (audioRef.current && !audioRef.current.paused) {
-            audioRef.current.pause();
-        }
-    }, [audioRef]);
+        // REMOVED: Auto-pause behavior to allow continuous audio playback during editing
+        // if (audioRef.current && !audioRef.current.paused) {
+        //     audioRef.current.pause();
+        // }
+    }, []);
 
     const VolumeIcon = () => {
         if (volume === 0) return <VolumeXIcon className="w-5 h-5 text-gray-400" />;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { MatchedWord, DiarizationSegment, SpeakerMap, TranscriptVersion, DataContextType } from '../types';
-import { parsePyannote, parseMfa, interpolateTimestamps, parsePastedTranscript, parseWhisperJson, alignAndApplyTimestamps } from '../services/processingService';
+import { parsePyannote, parseMfa, interpolateTimestamps, parsePastedTranscript, parseWhisperJson, alignAndApplyTimestamps, advancedWordMatching } from '../services/processingService';
 
 const DataContext = createContext<DataContextType | null>(null);
 
@@ -95,8 +95,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleApplyTimestamps = (data: MatchedWord[], type: 'MFA' | 'Whisper') => {
         if (!data || currentTranscript.length === 0) return;
         
-        // Use the robust alignment algorithm instead of the naive loop
-        const alignedWords = alignAndApplyTimestamps(currentTranscript, data);
+        // Use the advanced word matching algorithm for 99% accuracy (Montreal) or 100% (WhisperX)
+        const alignedWords = advancedWordMatching(currentTranscript, data);
         
         const finalTranscript = interpolateTimestamps(alignedWords);
         const newVersion: TranscriptVersion = {

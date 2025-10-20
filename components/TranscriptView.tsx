@@ -29,7 +29,8 @@ const EditableParagraph: React.FC<{
     textZoom: number;
     insertionRequest: { text: string } | null;
     onInsertionComplete: () => void;
-}> = ({ paragraph, onSave, textZoom, insertionRequest, onInsertionComplete }) => {
+    isNewParagraph?: boolean;
+}> = ({ paragraph, onSave, textZoom, insertionRequest, onInsertionComplete, isNewParagraph = false }) => {
     
     // Memoize the initial text generation for the textarea.
     const initialText = useMemo(() => {
@@ -91,9 +92,24 @@ const EditableParagraph: React.FC<{
 
     // Auto-focus the textarea when it mounts.
     useEffect(() => {
-        textareaRef.current?.focus();
-        textareaRef.current?.setSelectionRange(text.length, text.length); // Move cursor to end
-    }, []);
+        if (textareaRef.current) {
+            textareaRef.current.focus();
+            // For new paragraphs (created from Enter key), place cursor at start
+            // For existing paragraphs, place cursor at end
+            const cursorPosition = isNewParagraph ? 0 : text.length;
+            textareaRef.current.setSelectionRange(cursorPosition, cursorPosition);
+            
+            // Prevent container from scrolling by maintaining the current scroll position
+            const container = textareaRef.current.closest('.transcript-editor-view');
+            if (container) {
+                const scrollTop = container.scrollTop;
+                // Use requestAnimationFrame to ensure DOM updates are complete
+                requestAnimationFrame(() => {
+                    container.scrollTop = scrollTop;
+                });
+            }
+        }
+    }, [isNewParagraph, text.length]);
 
     const handleBlur = () => {
         // Small delay to allow any pending timestamp insertions to complete
@@ -142,6 +158,7 @@ export const TranscriptView = forwardRef<TranscriptViewHandle, TranscriptViewPro
     const menuRef = useRef<HTMLDivElement>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, word: MatchedWord } | null>(null);
     const nextEditingParaIndex = useRef<number | null>(null);
+    const isNewParagraph = useRef<boolean>(false);
 
     useEffect(() => {
         wordRefs.current = wordRefs.current.slice(0, words.length);
@@ -185,6 +202,7 @@ export const TranscriptView = forwardRef<TranscriptViewHandle, TranscriptViewPro
     useEffect(() => {
         if (nextEditingParaIndex.current !== null && nextEditingParaIndex.current < paragraphs.length) {
             setEditingParaIndex(nextEditingParaIndex.current);
+            isNewParagraph.current = true; // Mark as new paragraph for cursor positioning
             nextEditingParaIndex.current = null; // Clear the scheduled action
         }
     }, [paragraphs]);
@@ -365,11 +383,16 @@ export const TranscriptView = forwardRef<TranscriptViewHandle, TranscriptViewPro
                                             nextEditingParaIndex.current = pIndex + 1;
                                         }
                                         saveParagraph(pIndex, newText);
-                                        setEditingParaIndex(null);
+                                        if (!fromEnter) {
+                                            setEditingParaIndex(null);
+                                        }
+                                        // When fromEnter is true, we keep editing active for the new paragraph
+                                        isNewParagraph.current = false; // Reset after save
                                     }}
                                     textZoom={textZoom}
                                     insertionRequest={insertionRequest}
                                     onInsertionComplete={() => setInsertionRequest(null)}
+                                    isNewParagraph={isNewParagraph.current}
                                 />
                             ) : (
                                 <div className="outline-none">

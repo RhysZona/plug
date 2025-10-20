@@ -6,6 +6,8 @@ import { Chat } from './components/Chat';
 import { SettingsModal } from './components/SettingsModal';
 import { SpeakerEditorModal } from './components/SpeakerEditorModal';
 import { TextSpeakerEditorModal } from './components/TextSpeakerEditorModal';
+import { GeminiProductionEditor } from './components/GeminiProductionEditor';
+import { GPT4oProductionEditor } from './components/GPT4oProductionEditor';
 import { DataProvider, useData } from './contexts/DataContext';
 import { UIProvider, useUI } from './contexts/UIContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
@@ -18,6 +20,7 @@ const AppContent: React.FC = () => {
         isTextSpeakerEditorOpen, setIsTextSpeakerEditorOpen,
         leftSidebarOpen, setLeftSidebarOpen,
         chatOpen, setChatOpen,
+        currentTab,
     } = useUI();
     const { isLoading, loadingMessage } = useChat();
 
@@ -28,12 +31,14 @@ const AppContent: React.FC = () => {
             <SpeakerEditorModal />
             <TextSpeakerEditorModal />
             <main className="flex flex-1 overflow-hidden relative z-10">
-                <LeftSidebar
-                    isOpen={leftSidebarOpen}
-                    versions={transcriptVersions}
-                    currentVersionIndex={currentVersionIndex}
-                    onSelectVersion={setCurrentVersionIndex}
-                />
+                {currentTab === 'editor' && (
+                    <LeftSidebar
+                        isOpen={leftSidebarOpen}
+                        versions={transcriptVersions}
+                        currentVersionIndex={currentVersionIndex}
+                        onSelectVersion={setCurrentVersionIndex}
+                    />
+                )}
                 <div className="flex-1 flex flex-col relative">
                     {isLoading && (
                         <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
@@ -43,11 +48,21 @@ const AppContent: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    <Chat
-                        isOpen={chatOpen}
-                        onClose={() => setChatOpen(false)}
-                    />
-                    <Editor />
+                    {currentTab === 'editor' && (
+                        <>
+                            <Chat
+                                isOpen={chatOpen}
+                                onClose={() => setChatOpen(false)}
+                            />
+                            <Editor />
+                        </>
+                    )}
+                    {currentTab === 'gemini' && (
+                        <GeminiProductionEditor />
+                    )}
+                    {currentTab === 'gpt4o' && (
+                        <GPT4oProductionEditor />
+                    )}
                 </div>
             </main>
         </div>
