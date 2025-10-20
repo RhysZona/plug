@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
-// import { AudioUploader } from './AudioUploader';
-// import { ModelConfigPanel } from './ModelConfigPanel';
-// import { MonacoDiffEditor } from './DiffEditor';
+import { AudioUploader } from './AudioUploader';
+import { ModelConfigPanel } from './ModelConfigPanel';
+import { MonacoDiffEditor } from './DiffEditor';
 import { useGeminiStream, type GeminiConfig } from '../hooks/useGeminiStream';
 
 interface UploadedAudio {
@@ -188,17 +188,28 @@ Edit instruction: ${prompt}`
         <div className="lg:col-span-1 space-y-6">
           {/* Audio Upload */}
           <div className="bg-white border rounded-lg p-4">
-            <div className="text-center p-8 text-gray-500">
-              Audio uploader coming soon...
-            </div>
+            <AudioUploader 
+              onUploadComplete={handleAudioUpload}
+              disabled={isStreaming || isTranscribing}
+            />
+            {audioFile && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                <p className="text-sm text-green-700">
+                  ✅ <strong>{audioFile.fileName}</strong> uploaded successfully
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Type: {audioFile.mimeType}
+                </p>
+              </div>
+            )}
           </div>
           
           {/* Model Configuration */}
-          <div className="bg-white border rounded-lg p-4">
-            <div className="text-center p-8 text-gray-500">
-              Model configuration coming soon...
-            </div>
-          </div>
+          <ModelConfigPanel
+            config={config}
+            onConfigChange={setConfig}
+            disabled={isStreaming || isTranscribing}
+          />
           
           {/* Action Buttons */}
           <div className="bg-white border rounded-lg p-4 space-y-3">
@@ -293,13 +304,15 @@ Edit instruction: ${prompt}`
           
           {/* Diff Editor */}
           {editedText && originalText && (
-            <div className="bg-white border rounded-lg p-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                📝 Text Comparison
-              </h3>
-              <div className="text-center p-8 text-gray-500">
-                Monaco diff editor coming soon...
-              </div>
+            <div className="mb-6">
+              <MonacoDiffEditor
+                original={originalText}
+                modified={editedText}
+                onAccept={handleAcceptChanges}
+                onReject={handleRejectChanges}
+                language="markdown"
+                height="500px"
+              />
             </div>
           )}
           
