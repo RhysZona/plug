@@ -117,9 +117,13 @@ class OpenAIService {
       // Get request config with headers for API key
       const requestConfig = configManager.getRequestConfig('openai');
       
+      // Don't set Content-Type for FormData - browser will set it with boundary
+      const headers = { ...requestConfig.headers };
+      delete headers['Content-Type'];
+      
       const response = await fetch(url, {
         method: 'POST',
-        headers: requestConfig.headers,
+        headers,
         body: formData
       });
 
